@@ -22,7 +22,7 @@ A request to `/mcp/<secret>` counts as `Authorization: Bearer <secret>`. The hea
 - The service rewrites the request path to `/mcp` before the MCP code sees it, and logs only an error's class name. The secret and the request path are never written to a log, an error or a tool result.
 - The web page and `/api` are tailnet only. The proxy must not let them through Funnel: publish only `/bodymap/mcp/*`. Under Funnel they answer like any other path the gate refuses.
 
-Security note: **the URL is the credential.** Anyone who has it can read the body map and add layers (never lower or delete one). It is in the connector settings, in the phone's history if pasted there, and in any log that records request paths. The proxy must not log the path of `/bodymap/mcp/*` (Caddy: no access log for that route, or filter the `uri` field). To rotate: write a new value into the token file, restart the service, delete the connector in Claude and add it again with the new URL.
+Security note: **the URL is the credential.** Anyone who has it has full access to the map: read, add, lower and delete layers (the app's own tools take a grant that sits in the app page, which the URL holder can fetch). The "Claude cannot lower or delete" law holds for the model's tool list only (the edit tools are app-only), and it is not verified that Claude's host really hides app-only tools from the model. It is in the connector settings, in the phone's history if pasted there, and in any log that records request paths. The proxy must not log the path of `/bodymap/mcp/*` (Caddy: no access log for that route, or filter the `uri` field). To rotate: write a new value into the token file, restart the service, delete the connector in Claude and add it again with the new URL.
 Make a secret with 32 random bytes in base64url (43 characters):
 
 ```sh
@@ -33,7 +33,7 @@ The token may hold only letters, digits and `. _ ~ -` (base64url or hex), so it 
 
 ## The rules (each one has a test)
 
-1. Only Alex lowers a slider or deletes a layer. Claude's tools are `show_body_map`, `get_body_map`, `add_layer`. None of them can lower, clear or delete. The tools that can (`body_map_edit`, `body_map_state`) are `visibility: ["app"]`, so hosts must keep them out of the model's tool list, and they also demand a grant that exists only inside the app's own HTML.
+1. Only Alex lowers a slider or deletes a layer, as far as the MODEL goes: Claude's own tools are `show_body_map`, `get_body_map`, `add_layer`. None of them can lower, clear or delete. The tools that can (`body_map_edit`, `body_map_state`) are `visibility: ["app"]`, so hosts must keep them out of the model's tool list, and they also demand a grant that exists only inside the app's own HTML.
 2. `add_layer` only creates. A name that exists, cleared or not, is refused and nothing changes.
 3. Claude's level is capped (`BODYMAP_CLAUDE_MAX_LEVEL`, default 4). Alex can raise it.
 4. The picture holds only layers above 0, each at opacity level / 10. Level 0 = cleared, greyed in the list, absent from the picture, remembered in the text list.
