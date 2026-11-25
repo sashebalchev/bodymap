@@ -1,0 +1,33 @@
+{
+  "name": "bodymap",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Body map: Alex paints where it hurts, Claude reads it. MCP App plus a plain web page.",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "start": "node --disable-warning=ExperimentalWarning src/main.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "node --disable-warning=ExperimentalWarning --test \"test/**/*.test.ts\" --test-concurrency=1",
+    "check": "npm run build && npm run typecheck && npm test",
+    "mutants": "node scripts/mutants.mjs",
+    "look": "node scripts/look.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/core": "2.4.0",
+    "@modelcontextprotocol/ext-apps": "2.0.4",
+    "@modelcontextprotocol/node": "2.1.2",
+    "@modelcontextprotocol/server": "2.4.0",
+    "@resvg/resvg-wasm": "2.6.2",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/client": "2.4.0",
+    "@types/node": "26.6.10",
+    "esbuild": "0.28.2",
+    "typescript": "7.0.2"
+  }
+}
