@@ -35,3 +35,33 @@ test("a token can come from a file, whitespace trimmed, so no secret has to sit 
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("the web token can come from a file too", () => {
+  const dir = mkdtempSync(join(tmpdir(), "bodymap-cfg-"));
+  try {
+    writeFileSync(join(dir, "ui"), B + "\n");
+    const c = readConfig({ BODYMAP_DATA_DIR: "/x", BODYMAP_MCP_TOKEN: A, BODYMAP_UI_TOKEN_FILE: join(dir, "ui") }, "/d");
+    assert.equal(c.uiToken, B);
+    assert.throws(() => readConfig({ BODYMAP_DATA_DIR: "/x", BODYMAP_MCP_TOKEN: A, BODYMAP_UI_TOKEN_FILE: join(dir, "missing") }, "/d"), /ENOENT/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("the MCP token must fit in a URL path: base64url and hex pass, slash, plus, percent and space fail", () => {
+  for (const ok of ["Ab_-".repeat(11), "0123456789abcdef".repeat(3), "a.b~c-".repeat(6)]) assert.equal(readConfig({ ...base, BODYMAP_MCP_TOKEN: ok }, "/d").mcpToken, ok);
+  for (const bad of ["a/b".padEnd(30, "c"), "a+b".padEnd(30, "c"), "a%2fb".padEnd(30, "c"), "a b".padEnd(30, "c"), "a=".padEnd(30, "c"), "a?b".padEnd(30, "c")]) {
+    assert.throws(() => readConfig({ ...base, BODYMAP_MCP_TOKEN: bad }, "/d"), /letters, digits/, JSON.stringify(bad.slice(0, 4)));
+  }
+});
+
+test("the host is loopback by default, a named address is kept, and the wildcards are refused", () => {
+  assert.equal(readConfig({ ...base, BODYMAP_HOST: "127.0.0.2" }, "/d").host, "127.0.0.2");
+  for (const wild of ["0.0.0.0", "::", "[::]", "*", " "]) assert.throws(() => readConfig({ ...base, BODYMAP_HOST: wild }, "/d"), /every interface/, wild);
+});
+
+test("allowed hosts are a comma list of bare host names, lower-cased; anything else stops the start", () => {
+  assert.deepEqual(readConfig(base, "/d").allowedHosts, []);
+  assert.deepEqual(readConfig({ ...base, BODYMAP_ALLOWED_HOSTS: "Gym.tailcab34c.ts.net, other.example" }, "/d").allowedHosts, ["gym.tailcab34c.ts.net", "other.example"]);
+  for (const bad of ["https://gym.example", "gym.example:443", "gym.example/x", "gym example"]) assert.throws(() => readConfig({ ...base, BODYMAP_ALLOWED_HOSTS: bad }, "/d"), /host names only/, bad);
+});

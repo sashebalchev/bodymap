@@ -16,7 +16,7 @@ const MUTANTS = [
   ["the lowering tool is visible to the model", "src/mcp.ts", '_meta: { ui: { visibility: ["app"] } },\n    },\n    async ({ grant, base, edit })', '_meta: { ui: { visibility: ["model", "app"] } },\n    },\n    async ({ grant, base, edit })'],
   ["the app edit tool skips the grant", "src/mcp.ts", "if (grant !== deps.grant) return denied;\n      const reply", "const reply"],
   ["stale edits are not refused", "src/domain.ts", "if (target.rev > base)", "if (false as boolean)"],
-  ["the agent door needs no token", "src/http.ts", "if (!same(bearer(req), config.mcpToken))", "if (false as boolean)"],
+  ["the agent door needs no token", "src/http.ts", "if (!same(presented, config.mcpToken))", "if (false as boolean)"],
   ["the agent token opens the web API", "src/http.ts", "if (!same(bearer(req), config.uiToken)) return json(res, 401", "if (!same(bearer(req), config.uiToken) && !same(bearer(req), config.mcpToken)) return json(res, 401"],
   ["a damaged file is replaced by an empty map", "src/store.ts", 'throw new Error(file + " is not valid JSON.', 'return new Store(file, emptyState(now())); throw new Error(file + " is not valid JSON.'],
   ["the two tokens may be the same", "src/config.ts", "if (mcpToken === uiToken)", "if (false as boolean)"],

@@ -1,8 +1,11 @@
 // One small node:http server, two doors.
-//   /mcp   the agent door. Bearer token A. The only path meant to be reachable from the internet.
-//   /      the plain web page, and /api/* for it. Bearer token B, typed once into the page. Tailnet only.
+//   /mcp/<token>  the agent door. The only path meant to be reachable from the internet. The token A in the path
+//                 counts as "Authorization: Bearer A" (Claude's connector sends no header), and the header still works on /mcp.
+//   /             the plain web page, and /api/* for it. Bearer token B, typed once into the page. Tailnet only.
 // The two tokens are different on purpose: the token Claude's connector holds cannot reach /api,
 // and the token of the web page cannot call /mcp.
+// A failed agent-door check answers exactly like an unknown path (404, same body): no 401, no hint that a door is here.
+// Neither the token nor the request path of the agent door is ever logged or sent into the MCP SDK.
 import { createHash, timingSafeEqual } from "node:crypto";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { toNodeHandler } from "@modelcontextprotocol/node";
@@ -12,7 +15,7 @@ import { renderComposite } from "./render.ts";
 import type { BodyMap } from "./service.ts";
 import * as z from "zod/v4";
 
-export type AppConfig = { map: BodyMap; mcpToken: string; uiToken: string; webHtml: () => string; viewHtml: () => string; webUrl?: string };
+export type AppConfig = { map: BodyMap; mcpToken: string; uiToken: string; webHtml: () => string; viewHtml: () => string; webUrl?: string; allowedHosts?: string[] };
 
 const MAX_BODY = 1_000_000;
 const digest = (s: string) => createHash("sha256").update(s).digest();
@@ -28,6 +31,18 @@ function send(res: ServerResponse, status: number, body: string | Uint8Array, ty
   res.end(body);
 }
 const json = (res: ServerResponse, status: number, value: unknown) => send(res, status, JSON.stringify(value), "application/json; charset=utf-8");
+const notFound = (res: ServerResponse) => json(res, 404, { error: "not found" });
+const LOOPBACK = ["localhost", "127.0.0.1", "[::1]"];
+
+/** Host and Origin must name a host we expect. A missing Origin passes: only browsers send one. */
+function hostAllowed(req: IncomingMessage, allowed: string[]): boolean {
+  if (allowed.length === 0) return true;
+  const hostname = (value: string): string | null => { try { return new URL(value).hostname; } catch { return null; } };
+  const ok = (name: string | null) => name !== null && (allowed.includes(name) || LOOPBACK.includes(name));
+  if (!ok(hostname("http://" + (req.headers.host ?? "")))) return false;
+  const origin = req.headers.origin;
+  return origin === undefined || ok(hostname(origin));
+}
 const PAGE_CSP = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 
 async function readJson(req: IncomingMessage): Promise<unknown> {
@@ -49,18 +64,23 @@ const EditRequest = z.object({ base: z.int().min(0), edit: EditSchema });
 
 export function createApp(config: AppConfig): Server {
   const { map } = config;
+  const allowedHosts = config.allowedHosts ?? [];
   const mcpDeps: McpDeps = { map, grant: appGrant(config.uiToken), viewHtml: config.viewHtml, webUrl: config.webUrl };
   const mcp = toNodeHandler(createMcp(mcpDeps));
 
   const handle = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
+    if (!hostAllowed(req, allowedHosts)) return notFound(res);
     const url = new URL(req.url ?? "/", "http://local");
     const path = url.pathname;
 
-    if (path === "/mcp/health" && req.method === "GET") return json(res, 200, { ok: true });
+    if (path === "/healthz" && req.method === "GET") return json(res, 200, { ok: true });
 
-    if (path === "/mcp") {
-      if (!same(bearer(req), config.mcpToken)) return send(res, 401, JSON.stringify({ error: "unauthorized" }), "application/json", { "www-authenticate": "Bearer" });
+    if (path === "/mcp" || path.startsWith("/mcp/")) {
+      // The path token wins when there is one: a wrong path token is not rescued by a right header.
+      const presented = path === "/mcp" ? bearer(req) : path.slice("/mcp/".length);
+      if (!same(presented, config.mcpToken)) return notFound(res);
       if (Number(req.headers["content-length"] ?? 0) > MAX_BODY) return json(res, 413, { error: "body too large" });
+      req.url = "/mcp"; // the token leaves the request here, so nothing downstream can log or echo it
       return void (await mcp(req, res));
     }
 
@@ -77,7 +97,7 @@ export function createApp(config: AppConfig): Server {
         return json(res, reply.ok ? 200 : reply.error === "conflict" ? 409 : reply.error === "not_found" ? 404 : 422, reply);
       }
     }
-    json(res, 404, { error: "not found" });
+    notFound(res);
   };
 
   return createServer((req, res) => {
@@ -85,7 +105,8 @@ export function createApp(config: AppConfig): Server {
       const status = (error as { status?: number }).status ?? 500;
       if (!res.headersSent) json(res, status, { error: status === 500 ? "internal error" : (error as Error).message });
       else res.end();
-      if (status === 500) console.error("request failed:", (error as Error).message);
+      // Only the error's class: a message could carry a request path, and the agent door's path holds the token.
+      if (status === 500) console.error("request failed:", (error as Error).name);
     });
   });
 }

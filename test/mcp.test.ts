@@ -84,10 +84,10 @@ test("get_body_map returns a PNG and a list that leaves the cleared layer out of
 
 test("the agent door wants its token, the web token does not open it, and the agent token does not open the web API", async () => {
   const none = await fetch(s.url + "/mcp", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
-  assert.equal(none.status, 401);
-  assert.equal(none.headers.get("www-authenticate"), "Bearer");
+  assert.equal(none.status, 404);
+  assert.equal(none.headers.get("www-authenticate"), null);
   const wrong = await fetch(s.url + "/mcp", { method: "POST", headers: { authorization: "Bearer " + UI_TOKEN }, body: "{}" });
-  assert.equal(wrong.status, 401);
+  assert.equal(wrong.status, 404);
   assert.equal((await s.api("/api/state", { token: MCP_TOKEN })).status, 401);
   assert.equal((await s.api("/api/state", { token: "" })).status, 401);
   assert.equal((await s.api("/api/state")).status, 200);
@@ -112,7 +112,7 @@ test("the web door: edits go through, a stale screen gets a 409 with the fresh s
 
 test("an unknown path answers 404 and the health check answers without a token", async () => {
   assert.equal((await fetch(s.url + "/nothing")).status, 404);
-  assert.equal((await fetch(s.url + "/mcp/health")).status, 200);
+  assert.equal((await fetch(s.url + "/healthz")).status, 200);
   const page = await fetch(s.url + "/");
   assert.equal(page.status, 200);
   assert.match(page.headers.get("content-security-policy") ?? "", /default-src 'none'/);

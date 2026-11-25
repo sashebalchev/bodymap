@@ -24,7 +24,7 @@ const viewHtml = page("view.html", { mode: "mcp", grant: appGrant(config.uiToken
 
 const store = await Store.open(config.dataDir, () => new Date());
 const map = new BodyMap(store, config.claudeMaxLevel);
-const server = createApp({ map, mcpToken: config.mcpToken, uiToken: config.uiToken, webHtml: () => webHtml, viewHtml: () => viewHtml, webUrl: config.webUrl });
+const server = createApp({ map, mcpToken: config.mcpToken, uiToken: config.uiToken, webHtml: () => webHtml, viewHtml: () => viewHtml, webUrl: config.webUrl, allowedHosts: config.allowedHosts });
 
 server.listen(config.port, config.host, () => {
   const address = server.address();
