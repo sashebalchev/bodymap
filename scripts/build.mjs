@@ -15,7 +15,15 @@ for (const [entry, out] of [["mcpview", "view"], ["web", "web"]]) {
     entryPoints: [root + "src/ui/" + entry + ".ts"],
     bundle: true, write: false, format: "esm", target: "es2022", minify: true, legalComments: "none", charset: "ascii", platform: "browser",
   });
-  const code = (bundle.outputFiles[0]?.text ?? "").replaceAll("</script", "<\\/script");
+  let code = (bundle.outputFiles[0]?.text ?? "").replaceAll("</script", "<\\/script");
+  // zod probes for eval with new Function(""). The host's default CSP has no 'unsafe-eval', so the probe is
+  // caught but logs a violation. Make the probe fail without trying. If zod changes shape, stop here.
+  const probe = 'new Function("")';
+  if (entry === "mcpview") {
+    if (!code.includes(probe)) throw new Error("zod's eval probe was not found in the MCP App bundle: check scripts/build.mjs");
+    code = code.replaceAll(probe, "(()=>{throw 0})()");
+  }
+  if (/new Function|\beval\(/.test(code)) throw new Error(out + ": the bundle still uses eval or new Function, which the default MCP Apps CSP blocks");
   const html = template.replace("/*STYLE*/", () => style).replace("<script>/*SCRIPT*/</script>", () => '<script type="module">' + code + "</script>");
   await writeFile(root + "dist/" + out + ".html", html);
   console.log("dist/" + out + ".html", (html.length / 1024).toFixed(0) + " KB");
