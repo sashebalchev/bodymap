@@ -4,7 +4,7 @@
 import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { initWasm, Resvg } from "@resvg/resvg-wasm";
-import { figureSvg, layerSvg } from "./figure.ts";
+import { figureSvg, layerSvg, STAGE_BG } from "./figure.ts";
 import { activeLayers } from "./text.ts";
 import { FIG_H, FIG_W, VIEWS, type Layer, type MapState, type View } from "./types.ts";
 
@@ -20,7 +20,7 @@ function badge(n: number, x: number, y: number): string {
   const width = text.length * glyphW + (text.length - 1) * gap;
   const glyphs = [...text].map((ch, i) => `<path d="${DIGITS[ch] ?? ""}" transform="translate(${(i * (glyphW + gap)).toFixed(1)} 0) scale(${scale})"/>`).join("");
   return (
-    `<g data-badge="${n}"><circle cx="${x}" cy="${y}" r="${Math.max(14, width / 2 + 7)}" fill="#fff" stroke="#222" stroke-width="2.5"/>` +
+    `<g data-badge="${n}"><circle cx="${x}" cy="${y}" r="${Math.max(14, width / 2 + 7)}" fill="#fff" stroke="#0f1115" stroke-width="2.5"/>` +
     `<g transform="translate(${(x - width / 2).toFixed(1)} ${(y - 6.5 * scale).toFixed(1)})" fill="none" stroke="#222" stroke-width="2.2" vector-effect="non-scaling-stroke">${glyphs}</g></g>`
   );
 }
@@ -40,9 +40,9 @@ export function compositeSvg(state: MapState): string {
   const panels = VIEWS.map((view, i) => {
     const marks = active.map((l) => layerSvg(l, view)).join("");
     const badges = active.map((l, idx) => { const c = centre(l, view); return c ? badge(idx + 1, c[0], c[1]) : ""; }).join("");
-    return `<g transform="translate(${i * FIG_W} 0)" data-view="${view}"><rect width="${FIG_W}" height="${FIG_H}" fill="#fff"/>${figureSvg(view)}${marks}${badges}</g>`;
+    return `<g transform="translate(${i * FIG_W} 0)" data-view="${view}"><rect width="${FIG_W}" height="${FIG_H}" fill="${STAGE_BG}"/>${figureSvg(view)}${marks}${badges}</g>`;
   });
-  const divider = `<line x1="${FIG_W}" y1="0" x2="${FIG_W}" y2="${FIG_H}" stroke="#c9d1d6" stroke-width="2"/>`;
+  const divider = `<line x1="${FIG_W}" y1="0" x2="${FIG_W}" y2="${FIG_H}" stroke="#2a303b" stroke-width="2"/>`;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${FIG_W * 2}" height="${FIG_H}" viewBox="0 0 ${FIG_W * 2} ${FIG_H}">${panels.join("")}${divider}</svg>`;
 }
 

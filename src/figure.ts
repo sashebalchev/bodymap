@@ -1,55 +1,23 @@
-// The rough man. One source for the browser and the server's PNG, so they cannot drift apart.
+// The body drawing and the marks on it. One source for the phone app, the web page, the MCP view and the server's PNG,
+// so they cannot drift apart. The drawing itself is assets/figure/front.svg and back.svg (CC BY-SA 4.0, see
+// assets/figure/NOTICE.md). scripts/build.mjs inlines both files into src/figure-assets.ts with esbuild's text loader,
+// so nothing here reads a file at runtime.
+import { FIGURE_BACK, FIGURE_FRONT, FIGURE_NOTICE } from "./figure-assets.ts";
 import { FIG_H, FIG_W, KIND_COLOR, type Layer, type Stroke, type View } from "./types.ts";
 
-const OUTLINE = "#5b6770";
-const FILL = "#e6eaed";
-const DETAIL = "#9aa5ad";
+export { FIGURE_NOTICE };
 
-type Limb = [x1: number, y1: number, x2: number, y2: number, width: number];
-const mirror = (x: number) => FIG_W - x;
+/** The ground the figure stands on, in the app and in the picture Claude gets. */
+export const STAGE_BG = "#0f1115";
 
-const LIMBS: Limb[] = [
-  [200, 120, 200, 165, 34],
-  [118, 195, 88, 330, 42],
-  [mirror(118), 195, mirror(88), 330, 42],
-  [88, 330, 72, 470, 36],
-  [mirror(88), 330, mirror(72), 470, 36],
-  [165, 510, 160, 700, 66],
-  [mirror(165), 510, mirror(160), 700, 66],
-  [160, 700, 158, 850, 50],
-  [mirror(160), 700, mirror(158), 850, 50],
-];
-const TORSO = "118,170 282,170 268,330 258,430 272,520 128,520 142,430 132,330";
-const HANDS: [number, number][] = [[68, 490], [mirror(68), 490]];
-const FEET: [number, number][] = [[150, 872], [mirror(150), 872]];
+// The files carry a licence comment and no width or height. A nested svg without a size fills its parent, which would be
+// wrong inside the side by side picture, so it gets the drawing space's size.
+const sized = (svg: string): string => svg.replace(/<!--[\s\S]*?-->/g, "").trim().replace("<svg ", `<svg width="${FIG_W}" height="${FIG_H}" `);
+const DRAWINGS: Record<View, string> = { front: sized(FIGURE_FRONT), back: sized(FIGURE_BACK) };
 
-function silhouette(): string {
-  const parts: string[] = [];
-  for (const [pass, color, grow] of [["outline", OUTLINE, 8], ["fill", FILL, 0]] as const) {
-    const l = LIMBS.map(([a, b, c, d, w]) => `<line x1="${a}" y1="${b}" x2="${c}" y2="${d}" stroke-width="${w + grow}"/>`).join("");
-    const t = `<polygon points="${TORSO}" stroke-width="${grow || 2}" stroke-linejoin="round"/>`;
-    const h = `<circle cx="200" cy="78" r="${46 + grow / 2}" stroke-width="0"/>`;
-    const hands = HANDS.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="${20 + grow / 2}" stroke-width="0"/>`).join("");
-    const feet = FEET.map(([x, y]) => `<ellipse cx="${x}" cy="${y}" rx="${32 + grow / 2}" ry="${14 + grow / 2}" stroke-width="0"/>`).join("");
-    parts.push(`<g data-pass="${pass}" fill="${color}" stroke="${color}" stroke-linecap="round">${l}${t}${h}${hands}${feet}</g>`);
-  }
-  return parts.join("");
-}
-
-function details(view: View): string {
-  const style = `fill="none" stroke="${DETAIL}" stroke-width="3" stroke-linecap="round"`;
-  if (view === "front") {
-    return `<path d="M178 168 Q200 188 222 168" ${style}/><circle cx="200" cy="420" r="4" fill="${DETAIL}"/>`;
-  }
-  return (
-    `<path d="M200 165 L200 520" ${style} stroke-dasharray="10 8"/>` +
-    `<path d="M150 215 Q145 280 185 290" ${style}/><path d="M250 215 Q255 280 215 290" ${style}/>`
-  );
-}
-
-/** The empty outline for one view, in figure units (0..400 by 0..900). */
+/** The empty drawing for one view, in figure units (0..400 by 0..900). */
 export function figureSvg(view: View): string {
-  return silhouette() + details(view);
+  return DRAWINGS[view];
 }
 
 const f = (n: number) => String(Math.round(n));

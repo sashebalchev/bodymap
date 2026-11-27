@@ -61,4 +61,5 @@ export type EditReply =
   | { ok: true; state: MapState; layerId?: string }
   | { ok: false; error: EditFailure; message: string; state: MapState };
 
-export const KIND_COLOR: Record<Kind, string> = { tense: "#f59e0b", pinched: "#2563eb", sharp: "#dc2626" };
+/** Bright on purpose: the marks sit on a mid-grey drawing on a near-black ground (#0f1115), at opacity level / 10. */
+export const KIND_COLOR: Record<Kind, string> = { tense: "#f5a524", pinched: "#b58cff", sharp: "#ff5050" };

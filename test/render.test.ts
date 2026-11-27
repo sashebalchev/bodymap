@@ -30,18 +30,18 @@ test("a layer is drawn at opacity level / 10", () => {
   assert.match(svg, /data-layer="[^"]+" opacity="0.7"/);
 });
 
-test("the PNG is a real picture, front and back side by side, and a stronger level is darker", async () => {
+test("the PNG is a real picture, front and back side by side, and a stronger level stands out more from the drawing", async () => {
   const weak = await renderComposite(withClaudeLayers([{ name: "Lower back", kind: "sharp", region: "lower_back", level: 2 }]));
   const strong = await renderComposite(withClaudeLayers([{ name: "Lower back", kind: "sharp", region: "lower_back", level: 9 }]));
   const none = await renderComposite(withClaudeLayers([]));
   assert.deepEqual([...strong.png.slice(0, 4)], PNG_MAGIC);
   assert.deepEqual([strong.width, strong.height], [800, 900]);
-  // lower back is on the back view only: right half. A spot on the mark, away from the badge.
-  const at = (r: typeof weak) => pixel(r, 400 + 160, 430);
-  const [r0] = at(none), [rWeak] = at(weak), [rStrong] = at(strong);
-  assert.ok(r0 !== undefined && rWeak !== undefined && rStrong !== undefined);
-  assert.ok(rWeak < r0 && rWeak > rStrong, "red channel falls toward the sharp colour as level rises: " + [r0, rWeak, rStrong]);
-  assert.deepEqual(pixel(strong, 160, 430), pixel(none, 160, 430), "the front half is untouched");
+  // lower back is on the back view only: right half. A spot on the mark, away from the badge in its middle.
+  const at = (r: typeof weak) => pixel(r, 400 + 235, 392);
+  const away = (r: typeof weak) => at(r).reduce((sum, c, i) => sum + Math.abs(c - (at(none)[i] as number)), 0);
+  assert.ok(away(weak) > 20, "a weak mark shows: " + away(weak));
+  assert.ok(away(strong) > away(weak) + 60, "a strong mark shows more: " + [away(weak), away(strong)]);
+  assert.deepEqual(pixel(strong, 235, 392), pixel(none, 235, 392), "the front half is untouched");
 });
 
 test("a cleared layer's pixels match an empty map exactly", async () => {
