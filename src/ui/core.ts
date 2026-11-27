@@ -11,7 +11,13 @@ export { NeedsToken };
 export type { Backend, Snapshot } from "./backend.ts";
 
 export type MountOptions = { version?: string; notice?: string };
-export type Mounted = { controller: Controller; prefill(server: string, token: string): void };
+export type Mounted = {
+  controller: Controller;
+  /** The setup link bodymap://setup?server=...&token=... fills the two fields. Alex still taps Connect. */
+  prefill(server: string, token: string): void;
+  /** The system back button. True when it closed something, false when there is nothing left to close. */
+  back(): boolean;
+};
 
 type Screen = "main" | "about" | "setup";
 
@@ -82,6 +88,10 @@ export function mountUi(root: HTMLElement, backend: Backend, options: MountOptio
     });
     svg.addEventListener("pointerup", (e) => {
       if (!drawing || e.pointerId !== drawing.id) return;
+      // The lift can land past the last move the screen reported: the stroke ends where the finger left.
+      const end = toFigure(svg, e);
+      const last = drawing.pts[drawing.pts.length - 1] as [number, number];
+      if (Math.hypot(end[0] - last[0], end[1] - last[1]) >= 1) drawing.pts.push(end);
       const pts = drawing.pts;
       drawing = null;
       void ctrl.paint(pts);
@@ -350,5 +360,11 @@ export function mountUi(root: HTMLElement, backend: Backend, options: MountOptio
   return {
     controller: ctrl,
     prefill(server, token) { draft.server = server; draft.token = token; setupError = ""; screen = "setup"; render(); },
+    back() {
+      if (sheet) { sheet = false; editing = null; confirming = null; render(); return true; }
+      if (screen === "about") { screen = "main"; render(); return true; }
+      if (screen === "setup" && st().snap) { screen = "about"; render(); return true; }
+      return false;
+    },
   };
 }

@@ -21,7 +21,8 @@ function applyHost(): void {
 app.onhostcontextchanged = applyHost;
 
 async function tool(name: string, args: Record<string, unknown>) {
-  const result = await app.callServerTool({ name, arguments: { grant, ...args } });
+  // A call that never got an answer (the host or the server is gone) reads as "cannot reach the server", like a failed fetch.
+  const result = await app.callServerTool({ name, arguments: { grant, ...args } }).catch((error: unknown) => { throw new TypeError(error instanceof Error ? error.message : String(error)); });
   if (result.isError) throw new Error("The server refused the call. Close this and ask Claude to show the body map again.");
   return result.structuredContent as Record<string, unknown>;
 }

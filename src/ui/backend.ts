@@ -10,7 +10,7 @@ export type Setup = {
   server: string | null;
   /** Validate the address, then remember it and the token. Nothing is sent to the server yet. */
   connect(server: string, token: string): Promise<void>;
-  /** Forget the token (and the address). */
+  /** Forget the token. The address stays, so the next setup only asks for the token. */
   forget(): Promise<void>;
 };
 

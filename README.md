@@ -1,10 +1,14 @@
 # bodymap
 
-Alex paints where he feels tension, pinching or pain on a rough front and back outline of a man.
-Claude reads it before it plans a session. One small Node service, two doors:
+Alex paints where he feels tension, pinching or pain on a front and back drawing of a man's muscles.
+Claude reads it before it plans a session. One small Node service, two doors, and an Android app that talks to the second one:
 
 - **MCP App** at `/mcp/<secret>`. Claude shows the interactive canvas inside the chat (`show_body_map`), reads the map (`get_body_map`) and can add a layer from words (`add_layer`).
-- **Plain web page** at `/`, and its `/api/*`. The same canvas and the same API, for when the MCP App does not render.
+- **Plain web page** at `/`, and its `/api/*`. The same interface and the same API, for when the MCP App does not render.
+- **Android app** (`app/`, see "Android app" below). The same interface as the web page in a Capacitor shell, talking to `/api/*` over the tailnet.
+
+The one interface (`src/ui`) is dark, made for a phone (every touch target 48 px or more, no animation anywhere) and has three thin entry points: `web.ts` (the page), `mcpview.ts` (the MCP App) and `app/src/main.ts` (Android). Each gives it a `Backend` and nothing else.
+The figure is `assets/figure/front.svg` and `back.svg` (CC BY-SA 4.0, see `assets/figure/NOTICE.md`). The app, the web page, the MCP view and the PNG that `get_body_map` returns all draw that same file: `npm run build` inlines it into `src/figure-assets.ts` (esbuild's text loader), so nothing reads a file at runtime.
 
 ## The connector URL
 
@@ -44,7 +48,7 @@ The token may hold only letters, digits and `. _ ~ -` (base64url or hex), so it 
 
 ```sh
 npm ci
-npm run build                 # dist/view.html (MCP App) and dist/web.html, each one self-contained file
+npm run build                 # src/figure-assets.ts (the drawing, inlined), dist/view.html (MCP App) and dist/web.html, each one self-contained file
 export BODYMAP_DATA_DIR=$PWD/data
 export BODYMAP_MCP_TOKEN=$(openssl rand -hex 24)   # what Claude's connector presents
 export BODYMAP_UI_TOKEN=$(openssl rand -hex 24)    # what the web page presents
@@ -73,12 +77,13 @@ The two tokens are separate on purpose: the token Claude's connector holds canno
 ## Checks
 
 ```sh
-npm run check        # build, typecheck, 55 tests (domain laws, renderer, MCP over real HTTP, config, secret path, prefix, real process)
-npm run look         # real web page, real pointer, headless zen-beta, writes docs/screenshots/00-09
-node scripts/look-mcp.mjs   # the MCP App inside a stand-in host (the SDK's AppBridge), writes 10-13
+npm run check               # build, typecheck, __TESTS__ tests: domain laws, renderer and figure, the interface's controller and HTTP backend, MCP over real HTTP, config, secret path, prefix, real process
+npm run look                # the real interface with real touch pointers at 412 x 915, headless zen-beta, writes docs/screenshots/app-01..05
+node scripts/look-mcp.mjs   # the MCP App inside a stand-in host (the SDK's AppBridge), writes 10-13 and get_body_map-sample.png
 ```
 
-The look scripts need a Firefox-family browser on PATH (headless Chromium does not start in agent sessions on this machine).
+The look scripts need a Firefox-family browser on PATH (headless Chromium does not start in agent sessions on this machine). `npm run look` also measures: touch targets of 48 px and more, the slider thumb, no transition or animation anywhere, the weakest text contrast on screen, safe-area insets, a 360 x 640 phone, and where a stroke starts and ends compared with where the finger went (within 1.5 figure units).
+
 `scripts/mutants.mjs` breaks one rule at a time in a scratch copy and expects a red test. Written, **not yet run** (its anchor for the agent door was updated for the path secret). `GET /healthz` answers `{"ok":true}` without a token, for a local health check; it is not under `/mcp` any more.
 
 ## How the MCP App is wired
@@ -89,10 +94,45 @@ Built with `@modelcontextprotocol/server` 2.4, `@modelcontextprotocol/ext-apps` 
 `get_body_map` returns a PNG (front left, back right, numbered badges) and a text list: name, kind (tense, pinched, sharp), level, since when, who added it, plus the layers Alex cleared.
 Sample: `docs/screenshots/get_body_map-sample.png`.
 
+## Android app
+
+`app/` is a Capacitor 8 shell around the same interface as the web page. Package `dev.bodymap.app`, name "Body map", minSdk 24, target and compile SDK 36, permission INTERNET only (the build also adds androidx's own `DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`, a signature permission only this app can hold). It talks to `/api/*` of the server over the tailnet. Requests go through Capacitor's native HTTP plugin, so the server needs no CORS change and the WebView's mixed-content rules do not apply. The token sits in Capacitor Preferences (the app's private storage, excluded from backups). Release builds refuse cleartext http; the debug build allows it to `10.0.2.2` only (the emulator's name for the host machine).
+
+### Build
+
+Nothing is installed system wide. `app/shell.nix` gives a shell with JDK 21 (Capacitor 8 needs 21, not 17), gradle 8.14, node and an Android SDK (platform 36, build-tools 35.0.0, platform-tools) from nixpkgs. It accepts the Android SDK licence for that shell only.
+
+```sh
+scripts/android-build.sh            # signed release APK -> dist-android/bodymap-<version>.apk and .sha256
+scripts/android-build.sh debug      # debug APK, for the emulator test
+```
+
+The script enters the shell itself, runs gradle with `--no-daemon --max-workers=2` and `org.gradle.jvmargs=-Xmx2g`, and caps itself at 8 GB memory and 300 % CPU with `systemd-run` (set `BODYMAP_NO_LIMITS=1` to skip). The first run downloads about 1.3 GB of SDK and Maven artifacts. Gradle's cache and the SDK user directory live in `BODYMAP_ANDROID_SCRATCH` (default `~/.cache/bodymap-android`); delete it any time. `gradle --stop` runs at the end.
+
+The release key is made once, on the first release build, in `~/.local/share/bodymap-android/` (`keystore.jks` and `keystore.properties`, both mode 600, folder mode 700). The passwords are generated into the properties file, handed to keytool as a file, and read by gradle from that file. They are never in the repo, argv or the environment. **Back that folder up.** An APK signed with another key cannot be installed over this one, and the old app would have to be uninstalled first, which deletes its saved token.
+
+### Install, set up, update
+
+1. Copy `dist-android/bodymap-<version>.apk` to the phone (`adb install -r`, or any file transfer and tap it; Android asks once to allow installs from that app). Check `sha256sum -c bodymap-<version>.apk.sha256` on the way.
+2. Open the app. First run asks for the server address (prefilled with `https://gym.tailcab34c.ts.net/bodymap/`) and the web token (`BODYMAP_UI_TOKEN`). The phone must be on the tailnet.
+3. Or open `bodymap://setup?server=<url>&token=<token>` on the phone (a link in a note, a QR code, `adb shell am start -a android.intent.action.VIEW -d '<link>'`). It fills the two fields; Alex still taps Connect, so a stranger's link cannot point the app at a server by itself.
+4. Change the server or forget the token under the info button (About).
+5. **To update:** raise `bodymap.versionCode` in `app/package.json` (Android refuses an install whose versionCode is not higher; `version` is only the label), build, install over the old one. The token stays.
+
+About shows the version and the figure's attribution (from `assets/figure/NOTICE.md`).
+
+### Tests for the app
+
+```sh
+scripts/android-emulator-test.sh     # needs /dev/kvm and ~2.3 GB more SDK (emulator and a system image), one emulator, 10 minutes at most
+```
+
+It starts the real service on a localhost port with test tokens and a throwaway data dir, boots a headless x86_64 emulator, installs the debug APK, opens the setup link, taps Connect, adds a mark, paints a stroke and moves a slider with `adb input`, and then reads `/api/state` to see what the service holds. It kills the emulator by pid and deletes its scratch dir at the end.
+
 ## Rendering and the Pi
 
-The PNG is drawn as SVG and rasterised by `@resvg/resvg-wasm`: WebAssembly, so no native binary per architecture, nothing to patch for aarch64 under Nix, and no font file (badge digits are drawn as strokes). I chose it over skia-canvas and @napi-rs/canvas because those ship prebuilt per-platform `.node` files (a packaging risk on NixOS aarch64) for no gain on an 800 by 900 picture.
-Measured on this x86 laptop: first render 91 ms, then about 23 ms each; a process that rendered 20 times held 208 MB RSS (whole Node process, measured once). On a Pi 5 I expect two to three times slower, still well under a second, and the same order of memory. That is an estimate, not a measurement. 1 GB spare is enough by a wide margin.
+The PNG is drawn as SVG and rasterised by `@resvg/resvg-wasm`: WebAssembly, so no native binary per architecture, nothing to patch for aarch64 under Nix, and no font file (badge digits are drawn as strokes). I chose it over skia-canvas and @napi-rs/canvas because those ship prebuilt per-platform `.node` files (a packaging risk on NixOS aarch64) for no gain on an 800 by 710 picture.
+Measured on this x86 laptop (2026-11-27, with the detailed muscle drawing, other programs running): first render 211 ms, then about 90 ms each, 194 MB RSS for a Node process that rendered 21 times (measured once). The old stick figure took 23 ms. On a Pi 5 I expect two to three times slower, still well under a second, and the same order of memory. That is an estimate, not a measurement. 1 GB spare is enough by a wide margin.
 
 ## Building for NixOS
 
@@ -147,7 +187,8 @@ Service shape for the module: DynamicUser, `StateDirectory=bodymap` as `BODYMAP_
 
 ## What is not proven
 
-- **Claude's own renderer.** Nothing here ran inside claude.ai or the phone app. The MCP App was tested in a stand-in host built from the official AppBridge, under the documented default CSP. The phone WebView, the safe-area handling and Pointer Events on a real touch screen are unchecked.
+- **Claude's own renderer.** Nothing here ran inside claude.ai or the phone app. The MCP App was tested in a stand-in host built from the official AppBridge, under the documented default CSP.
+- **A real phone.** The Android app was run in an x86_64 emulator (API 36, Google APIs image) with `adb` touches, not on hardware. Not checked: the Tailscale path from a phone, the https certificate of the real server, a different WebView version, a slow network, a gesture-navigation phone's real insets, the system keyboard (the test types with `adb input text`), install over an older version (versionCode), and the release APK running at all: the release build was inspected (signature, manifest, size) and built from the same sources as the debug build that ran, but it was not started.
 - **Authentication to the connector.** The decision is no OAuth: the secret sits in the URL path (see "The connector URL"). Whether Claude's custom connector accepts a URL that carries a path secret, and does not demand OAuth discovery, is untested. Constant-time comparison is read from the code (`timingSafeEqual` on SHA-256 digests), not measured. The tests show wrong secrets get the unknown-path answer; no mutation check was run on the new tests (the mutation script was not run, by rule), so whether each test can fail is shown by the negative cases inside them, not by deliberate breaks.
 - **The proxy.** The Caddy rules, the Funnel allowlist and the no-path-logging rule live in the Nix module. A stand-in proxy in `test/door.test.ts` proves the prefix handling, not Caddy itself.
 - `_meta.ui.domain` is not set. Claude wants the first 32 hex chars of SHA-256 of the exact connector URL plus `.claudemcpcontent.com`, and only apps with their own CORS or OAuth need it.

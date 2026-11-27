@@ -28,7 +28,7 @@ const harness = createServer((req, res) => {
   else { res.writeHead(200, { "content-type": "text/html" }); res.end('<!doctype html><meta name=viewport content="width=device-width, initial-scale=1"><body style="margin:0"><script type="module" src="/host.js"></script>'); }
 });
 await new Promise((r) => harness.listen(0, "127.0.0.1", r));
-const harnessUrl = "http://127.0.0.1:" + harness.address().port + "/?token=" + MCP_TOKEN;
+const harnessUrl = "http://127.0.0.1:" + harness.address().port + "/?h=800&token=" + MCP_TOKEN;
 
 try {
   await withBrowser(async (b) => {
@@ -48,7 +48,7 @@ try {
     check(await b.run("window.hostReady === true"), "host connected to the server and mounted the ui:// resource in an iframe");
     check((await b.run("window.resourceMime")) === "text/html;profile=mcp-app", "resource mime type is text/html;profile=mcp-app");
     await b.sleep(1200);
-    check(/Up to date/.test((await textIn('[data-role="status"]')) ?? ""), "the app initialised with the host and loaded the map through its app-only tool: " + (await textIn('[data-role="status"]')));
+    check(/Synced, revision 0/.test((await textIn('[data-role="status"]')) ?? ""), "the app initialised with the host and loaded the map through its app-only tool: " + (await textIn('[data-role="status"]')));
     check((await inView("!!D.querySelector('[data-role=empty]')")) === true, "empty state shown inside the frame");
     await shoot("10-mcp-empty");
 
@@ -59,7 +59,8 @@ try {
     check(!added.isError, "Claude's add_layer through the same connection: " + added.content[0].text.slice(0, 60));
     await clickIn('[data-role="refresh"]');
     await b.sleep(500);
-    check((await textIn('[data-role="layer"] .tag')) === "added by Claude", "Refresh in the app shows the layer Claude added");
+    await clickIn('[data-role="marks-open"]');
+    check((await textIn('[data-role="mark"] .tag')) === "added by Claude", "Refresh in the app shows the layer Claude added");
 
     // paint with a real pointer inside the frame
     await clickIn('[data-role="paint"]');
@@ -67,7 +68,7 @@ try {
     await measure();
     await b.sleep(300);
     const box = await measure();
-    const P = ([x, y]) => ({ x: Math.round(box.left + (x / 400) * box.w), y: Math.round(box.top + (y / 900) * box.h) });
+    const P = ([x, y]) => ({ x: Math.round(box.left + (x / 400) * box.w), y: Math.round(box.top + ((y - 96) / 710) * box.h) });
     const path = [[250, 200], [262, 215], [275, 205], [268, 190]].map(P);
     await b.pointer([{ type: "pointerMove", ...path[0] }, { type: "pointerDown", button: 0 }, ...path.slice(1).map((p) => ({ type: "pointerMove", ...p, duration: 40 })), { type: "pointerUp", button: 0 }]);
     await b.sleep(700);
@@ -83,6 +84,7 @@ try {
     await shoot("11-mcp-painted");
 
     // Alex drags the slider to 0 in the app; Claude sees it cleared
+    await clickIn('[data-role="marks-open"]');
     const measureSlider = () => b.run("(() => { const D = " + F + "; const f = document.querySelector('iframe').getBoundingClientRect(); const e = D.querySelector('[data-role=slider]'); e.scrollIntoView({block:'center'}); const r = e.getBoundingClientRect(); return {left: f.left + r.left, w: r.width, y: f.top + r.top + r.height/2}; })()");
     await measureSlider();
     await b.sleep(300);
@@ -99,7 +101,7 @@ try {
     await clickIn('[data-role="refresh"]');
     await b.sleep(800);
     const banner = (await textIn('[data-role="banner"]')) ?? "";
-    check(/Could not load/.test(banner) && /web page: http:\/\/berry:8104/.test(banner), "server down: the app says so and names the web page fallback");
+    check(/Cannot reach the server/.test(banner) && /web page: http:\/\/berry:8104/.test(banner), "server down: the app says so and names the web page fallback: " + banner.slice(0, 160));
     await shoot("13-mcp-error");
 
     const csp = b.problems.filter((p) => /Content-Security-Policy/.test(p));
