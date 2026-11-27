@@ -35,7 +35,7 @@ pkgs.mkShell {
   # AGP would download its own aapt2 from Maven, a dynamically linked binary that does not run on NixOS. Use the SDK's.
   GRADLE_OPTS = "-Dorg.gradle.project.android.aapt2FromMavenOverride=${root}/build-tools/35.0.0/aapt2";
   shellHook = ''
-    export GRADLE_USER_HOME="''${GRADLE_USER_HOME:-$HOME/.cache/bodymap-android/gradle}"
+    export GRADLE_USER_HOME="''${GRADLE_USER_HOME:-''${BODYMAP_ANDROID_SCRATCH:-$HOME/.cache/bodymap-android}/gradle}"
     mkdir -p "$GRADLE_USER_HOME"
   '';
 }
