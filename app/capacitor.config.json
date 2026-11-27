@@ -1,0 +1,22 @@
+{
+  "appId": "dev.bodymap.app",
+  "appName": "Body map",
+  "webDir": "www",
+  "backgroundColor": "#0f1115",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#0f1115"
+  },
+  "plugins": {
+    "CapacitorHttp": {
+      "enabled": true
+    },
+    "SystemBars": {
+      "insetsHandling": "css",
+      "style": "DARK"
+    }
+  }
+}

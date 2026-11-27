@@ -1,0 +1,23 @@
+{
+  "name": "bodymap-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Body map for Android: the same interface as the web page, in a Capacitor shell with native HTTP.",
+  "bodymap": {
+    "versionCode": 1
+  },
+  "scripts": {
+    "build:web": "node build-web.mjs",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "@capacitor/android": "8.6.3",
+    "@capacitor/app": "8.1.2",
+    "@capacitor/core": "8.6.3",
+    "@capacitor/preferences": "8.0.1"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.6.3"
+  }
+}
