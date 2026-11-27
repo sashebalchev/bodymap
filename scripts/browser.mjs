@@ -21,7 +21,7 @@ export async function withBrowser(body) {
   const problems = [];
   let socket, nextId = 0;
   const cleanup = () => { try { process.kill(-child.pid, "SIGKILL"); } catch {} rmSync(profile, { recursive: true, force: true, maxRetries: 5 }); };
-  const timer = setTimeout(() => { cleanup(); process.exit(2); }, 240_000);
+  const timer = setTimeout(() => { cleanup(); process.exit(2); }, 55_000);
   try {
     const address = await new Promise((resolve, reject) => {
       let text = "";
@@ -52,8 +52,8 @@ export async function withBrowser(body) {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     const browser = {
       problems, sleep,
-      async open(url, width, height) {
-        await send("browsingContext.setViewport", { context, viewport: { width, height }, devicePixelRatio: 2 });
+      async open(url, width, height, dpr = 2) {
+        await send("browsingContext.setViewport", { context, viewport: { width, height }, devicePixelRatio: dpr });
         await send("browsingContext.navigate", { context, url: "about:blank", wait: "complete" });
         await send("browsingContext.navigate", { context, url, wait: "complete" });
         await sleep(500);
@@ -64,7 +64,8 @@ export async function withBrowser(body) {
         return answer.result.type === "string" ? JSON.parse(answer.result.value) : undefined;
       },
       async shoot(file) { const { data } = await send("browsingContext.captureScreenshot", { context, origin: "document" }); writeFileSync(file, Buffer.from(data, "base64")); },
-      pointer: (actions) => send("input.performActions", { context, actions: [{ type: "pointer", id: "finger", parameters: { pointerType: "mouse" }, actions }] }),
+      /** A finger by default (pointerType "touch"): the interface must work with touch pointer events. Pass "mouse" for a mouse. */
+      pointer: (actions, pointerType = "touch") => send("input.performActions", { context, actions: [{ type: "pointer", id: "finger", parameters: { pointerType }, actions }] }),
       async type(text) {
         const keys = [...text].flatMap((key) => [{ type: "keyDown", value: key }, { type: "keyUp", value: key }]);
         await send("input.performActions", { context, actions: [{ type: "key", id: "keyboard", actions: keys }] });

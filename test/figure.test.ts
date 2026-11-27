@@ -5,7 +5,7 @@ import { figureAssetsModule } from "../scripts/figure-assets.mjs";
 import { FIGURE_NOTICE, figureSvg, STAGE_BG } from "../src/figure.ts";
 import { REGION_IDS, regionStrokes } from "../src/regions.ts";
 import { compositeSvg, renderComposite } from "../src/render.ts";
-import { FIG_H, FIG_W, KIND_COLOR, KINDS, VIEWS } from "../src/types.ts";
+import { FIG_H, FIG_VIEW, FIG_W, KIND_COLOR, KINDS, VIEWS } from "../src/types.ts";
 import { contrast } from "../src/ui/logic.ts";
 import { withClaudeLayers } from "./helpers.ts";
 
@@ -48,7 +48,7 @@ test("every named place Claude can mark lies on the drawing, in every view it is
   const bg = [0x0f, 0x11, 0x15];
   assert.equal(STAGE_BG, "#0f1115");
   const onBody = (view: "front" | "back", x: number, y: number) => {
-    const px = (VIEWS.indexOf(view) * FIG_W + Math.round(x)) + Math.round(y) * empty.width;
+    const px = (VIEWS.indexOf(view) * FIG_W + Math.round(x)) + (Math.round(y) - FIG_VIEW.y) * empty.width;
     const rgb = [...empty.pixels.slice(px * 4, px * 4 + 3)];
     return rgb.some((c, i) => Math.abs(c - (bg[i] as number)) > 12);
   };
@@ -83,4 +83,15 @@ test("mark colours stand out from the ground and from the drawing's greys", asyn
   }
   const unique = new Set(KINDS.map((k) => KIND_COLOR[k]));
   assert.equal(unique.size, KINDS.length);
+});
+
+test("the part of the drawing that is shown holds the whole figure and little empty ground", async () => {
+  const empty = await renderComposite(withClaudeLayers([]));
+  const rows = (x0: number) => { const found: number[] = []; for (let y = 0; y < empty.height; y++) for (let x = x0 + 4; x < x0 + FIG_W - 4; x++) { const i = (y * empty.width + x) * 4; if (Math.abs((empty.pixels[i] ?? 0) - 15) > 12 || Math.abs((empty.pixels[i + 1] ?? 0) - 17) > 12) { found.push(y); break; } } return found; };
+  for (const [name, x0] of [["front", 0], ["back", FIG_W]] as const) {
+    const r = rows(x0);
+    assert.ok((r[0] ?? 0) <= 20, name + ": the head starts " + r[0] + " rows below the top of the picture");
+    assert.ok(empty.height - (r.at(-1) ?? 0) <= 30, name + ": the feet end " + (empty.height - (r.at(-1) ?? 0)) + " rows above the bottom");
+    assert.ok((r[0] ?? 0) > 0 && (r.at(-1) ?? 0) < empty.height - 1, name + ": nothing of the figure is cut off");
+  }
 });

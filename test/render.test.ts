@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { applyEdit } from "../src/domain.ts";
 import { compositeSvg, renderComposite } from "../src/render.ts";
-import type { MapState } from "../src/types.ts";
+import { FIG_VIEW, type MapState } from "../src/types.ts";
 import { T1, withClaudeLayers } from "./helpers.ts";
 
 const withoutIds = (svg: string) => svg.replace(/ data-layer="[^"]*"/g, "");
@@ -35,13 +35,13 @@ test("the PNG is a real picture, front and back side by side, and a stronger lev
   const strong = await renderComposite(withClaudeLayers([{ name: "Lower back", kind: "sharp", region: "lower_back", level: 9 }]));
   const none = await renderComposite(withClaudeLayers([]));
   assert.deepEqual([...strong.png.slice(0, 4)], PNG_MAGIC);
-  assert.deepEqual([strong.width, strong.height], [800, 900]);
+  assert.deepEqual([strong.width, strong.height], [800, 710]);
   // lower back is on the back view only: right half. A spot on the mark, away from the badge in its middle.
-  const at = (r: typeof weak) => pixel(r, 400 + 235, 392);
+  const at = (r: typeof weak) => pixel(r, 400 + 235, 392 - FIG_VIEW.y);
   const away = (r: typeof weak) => at(r).reduce((sum, c, i) => sum + Math.abs(c - (at(none)[i] as number)), 0);
   assert.ok(away(weak) > 20, "a weak mark shows: " + away(weak));
   assert.ok(away(strong) > away(weak) + 60, "a strong mark shows more: " + [away(weak), away(strong)]);
-  assert.deepEqual(pixel(strong, 235, 392), pixel(none, 235, 392), "the front half is untouched");
+  assert.deepEqual(pixel(strong, 235, 392 - FIG_VIEW.y), pixel(none, 235, 392 - FIG_VIEW.y), "the front half is untouched");
 });
 
 test("a cleared layer's pixels match an empty map exactly", async () => {

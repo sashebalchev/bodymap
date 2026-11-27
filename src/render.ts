@@ -6,7 +6,7 @@ import { createRequire } from "node:module";
 import { initWasm, Resvg } from "@resvg/resvg-wasm";
 import { figureSvg, layerSvg, STAGE_BG } from "./figure.ts";
 import { activeLayers } from "./text.ts";
-import { FIG_H, FIG_W, VIEWS, type Layer, type MapState, type View } from "./types.ts";
+import { FIG_VIEW, FIG_W, VIEWS, type Layer, type MapState, type View } from "./types.ts";
 
 // Digits on a 6 by 10 grid, drawn as one polyline each.
 const DIGITS: Record<string, string> = {
@@ -40,10 +40,10 @@ export function compositeSvg(state: MapState): string {
   const panels = VIEWS.map((view, i) => {
     const marks = active.map((l) => layerSvg(l, view)).join("");
     const badges = active.map((l, idx) => { const c = centre(l, view); return c ? badge(idx + 1, c[0], c[1]) : ""; }).join("");
-    return `<g transform="translate(${i * FIG_W} 0)" data-view="${view}"><rect width="${FIG_W}" height="${FIG_H}" fill="${STAGE_BG}"/>${figureSvg(view)}${marks}${badges}</g>`;
+    return `<g transform="translate(${i * FIG_W} ${-FIG_VIEW.y})" data-view="${view}"><rect y="${FIG_VIEW.y}" width="${FIG_W}" height="${FIG_VIEW.h}" fill="${STAGE_BG}"/>${figureSvg(view)}${marks}${badges}</g>`;
   });
-  const divider = `<line x1="${FIG_W}" y1="0" x2="${FIG_W}" y2="${FIG_H}" stroke="#2a303b" stroke-width="2"/>`;
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${FIG_W * 2}" height="${FIG_H}" viewBox="0 0 ${FIG_W * 2} ${FIG_H}">${panels.join("")}${divider}</svg>`;
+  const divider = `<line x1="${FIG_W}" y1="0" x2="${FIG_W}" y2="${FIG_VIEW.h}" stroke="#2a303b" stroke-width="2"/>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${FIG_W * 2}" height="${FIG_VIEW.h}" viewBox="0 0 ${FIG_W * 2} ${FIG_VIEW.h}">${panels.join("")}${divider}</svg>`;
 }
 
 let ready: Promise<void> | undefined;

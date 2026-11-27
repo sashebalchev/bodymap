@@ -1,6 +1,9 @@
 // The plain web page. Same interface, talks to api/ (relative) with the token Alex pasted once.
-import type { Edit, EditReply } from "../types.ts";
-import { mountUi, NeedsToken, type Backend, type Snapshot } from "./core.ts";
+import { apiBackend, type Backend, type HttpResponse, type Transport } from "./backend.ts";
+import { mountUi } from "./core.ts";
+import { FIGURE_NOTICE } from "../figure.ts";
+
+declare const __APP_VERSION__: string;
 
 const KEY = "bodymap.token";
 const store = {
@@ -20,27 +23,14 @@ if (fromHash) {
   history.replaceState(null, "", location.pathname);
 }
 
-async function api(path: string, init: RequestInit = {}): Promise<Response> {
-  const token = memory ?? store.get();
-  if (!token) throw new NeedsToken("");
-  const response = await fetch(path, { ...init, headers: { authorization: "Bearer " + token, "content-type": "application/json" } });
-  if (response.status === 401) throw new NeedsToken("That token was not accepted. Paste it again.");
-  return response;
-}
-
-const backend: Backend = {
-  setToken(token) { memory = token; store.set(token); },
-  async load(): Promise<Snapshot> {
-    const response = await api("api/state");
-    if (!response.ok) throw new Error("The server answered " + response.status + ".");
-    return (await response.json()) as Snapshot;
-  },
-  async edit(base: number, edit: Edit): Promise<EditReply> {
-    const response = await api("api/edit", { method: "POST", body: JSON.stringify({ base, edit }) });
-    const body = (await response.json()) as EditReply | { error: string; message?: string };
-    if ("ok" in body) return body;
-    throw new Error(body.message ?? body.error);
-  },
+const transport: Transport = async ({ url, method, token, body }): Promise<HttpResponse> => {
+  const response = await fetch(url, { method, headers: { authorization: "Bearer " + token, "content-type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
+  return { status: response.status, body: await response.json().catch(() => null) };
 };
 
-mountUi(document.getElementById("app") as HTMLElement, backend);
+const backend: Backend = {
+  ...apiBackend({ base: () => "", token: () => memory ?? store.get(), transport }),
+  setToken(token) { memory = token; store.set(token); },
+};
+
+mountUi(document.getElementById("app") as HTMLElement, backend, { version: __APP_VERSION__, notice: FIGURE_NOTICE });

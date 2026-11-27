@@ -2,7 +2,11 @@
 // as tool calls, to the two app-only tools on the same server.
 import { App } from "@modelcontextprotocol/ext-apps/app-with-deps";
 import type { Edit, EditReply } from "../types.ts";
-import { mountUi, type Backend, type Snapshot } from "./core.ts";
+import { FIGURE_NOTICE } from "../figure.ts";
+import type { Backend, Snapshot } from "./backend.ts";
+import { mountUi } from "./core.ts";
+
+declare const __APP_VERSION__: string;
 
 const boot = JSON.parse(atob(document.getElementById("boot")?.textContent ?? "e30=")) as { grant?: string; webUrl?: string | null };
 const grant = boot.grant ?? "";
@@ -11,9 +15,8 @@ const app = new App({ name: "bodymap", version: "0.1.0" }, {});
 
 function applyHost(): void {
   const context = app.getHostContext();
-  if (context?.theme) document.documentElement.dataset.theme = context.theme;
   const inset = context?.safeAreaInsets;
-  if (inset) document.documentElement.style.setProperty("--safe", inset.top + "px " + inset.right + "px " + inset.bottom + "px " + inset.left + "px");
+  if (inset) for (const side of ["top", "right", "bottom", "left"] as const) document.documentElement.style.setProperty("--host-" + side, inset[side] + "px");
 }
 app.onhostcontextchanged = applyHost;
 
@@ -38,4 +41,4 @@ const backend: Backend = {
 app.ontoolresult = () => {};
 await app.connect();
 applyHost();
-mountUi(document.getElementById("app") as HTMLElement, backend);
+mountUi(document.getElementById("app") as HTMLElement, backend, { version: __APP_VERSION__, notice: FIGURE_NOTICE });

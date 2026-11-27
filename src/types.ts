@@ -8,6 +8,8 @@ export type View = (typeof VIEWS)[number];
 /** Drawing space of one figure, in whole units. The two figures sit side by side in the composite. */
 export const FIG_W = 400;
 export const FIG_H = 900;
+/** The part of the drawing space that is shown: the drawing has about 10 % empty ground above and below. Strokes stay in the full space. */
+export const FIG_VIEW = { y: 96, h: 710 } as const;
 
 export const LIMITS = {
   maxLayers: 40,
